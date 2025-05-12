@@ -1,0 +1,78 @@
+
+# VUE Resurrection Protocol for macOS – Full Procedure Archive
+
+Created by Dez + GPT Tech Priest, on May 12, 2025.
+
+## Overview:
+Successfully installed and launched VUE.app (a legacy Java 6 application) on macOS despite SIP, Gatekeeper, and installer roadblocks. This archive details every step used to manually revive and override the Java runtime dependency.
+
+## STAGE I: Installing Java 6
+
+1. Download Java 6 DMG from:
+   https://support.apple.com/kb/DL1572?locale=en_US
+
+2. Mount the .dmg, DO NOT run the installer (it fails with newer Java or SIP restrictions).
+
+3. Extract contents:
+   mkdir ~/java6pkg
+   cd ~/java6pkg
+   pkgutil --expand "/Volumes/Java for macOS 2017-001/JavaForOSX.pkg" ./expanded
+   cd expanded/JavaForOSX.pkg
+   cat Payload | gunzip -dc | cpio -i
+
+4. Find the actual JDK:
+   find . -name "1.6.0.jdk"
+
+5. Install manually:
+   sudo cp -R ./Library/Java/JavaVirtualMachines/1.6.0.jdk /Library/Java/JavaVirtualMachines/
+
+6. Test in Terminal:
+   export JAVA_HOME="/Library/Java/JavaVirtualMachines/1.6.0.jdk/Contents/Home"
+   export PATH="$JAVA_HOME/bin:$PATH"
+   java -version
+
+## STAGE II: SIP + Gatekeeper Bypass
+
+Disable SIP:
+1. Reboot into Recovery Mode (Cmd + R)
+2. Terminal -> csrutil disable
+3. Reboot
+
+Remount filesystem as writable (optional if symlinks are blocked):
+   mount -uw /
+
+Create system symlink (only needed if app requires /System Java):
+   sudo mkdir -p /System/Library/Java/JavaVirtualMachines
+   sudo ln -s /Library/Java/JavaVirtualMachines/1.6.0.jdk /System/Library/Java/JavaVirtualMachines/1.6.0.jdk
+
+## STAGE III: VUE Launcher Hijack
+
+1. Navigate into the app:
+   cd /Applications/VUE.app/Contents/MacOS
+
+2. Rename original launcher:
+   sudo mv universalJavaApplicationStub VUE.real
+
+3. Create custom launcher:
+   sudo nano universalJavaApplicationStub
+
+Paste:
+   #!/bin/bash
+   export JAVA_HOME="/Library/Java/JavaVirtualMachines/1.6.0.jdk/Contents/Home"
+   export PATH="$JAVA_HOME/bin:$PATH"
+   /Applications/VUE.app/Contents/MacOS/VUE.real "$@"
+
+Then:
+   sudo chmod +x universalJavaApplicationStub
+
+4. Fix Gatekeeper errors:
+   sudo spctl --master-disable
+
+(Optional) Remove quarantine tags:
+   xattr -dr com.apple.quarantine /Applications/VUE.app
+
+5. Launch VUE manually if needed:
+   /Applications/VUE.app/Contents/MacOS/universalJavaApplicationStub
+
+VUE boots successfully.
+All system protections can be re-enabled afterward via csrutil enable.
